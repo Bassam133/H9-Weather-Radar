@@ -1,0 +1,12 @@
+# Large files
+home/.npm/
+/tools/
+
+# Cache
+*.cache
+
+# OS
+.DS_Store
+
+# Logs
+*.log

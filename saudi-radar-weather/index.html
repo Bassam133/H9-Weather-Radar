@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رادار السعودية للطقس | Saudi Weather Radar</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Google Fonts - Cairo & Tajawal -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Top Header Overlay */
+        .top-header {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            left: 15px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .brand-card {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 18px;
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-card i {
+            color: #38bdf8;
+            font-size: 1.6rem;
+        }
+
+        .brand-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #f8fafc;
+            line-height: 1.2;
+        }
+
+        .brand-subtitle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .controls-group {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .btn-action {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-action:hover {
+            background: #1e293b;
+            border-color: #38bdf8;
+            color: #38bdf8;
+        }
+
+        /* Floating City Selector */
+        .city-chips {
+            position: absolute;
+            top: 75px;
+            right: 15px;
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            max-width: calc(100vw - 30px);
+            padding-bottom: 5px;
+            scrollbar-width: none;
+        }
+
+        .city-chips::-webkit-scrollbar {
+            display: none;
+        }
+
+        .chip {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chip:hover, .chip.active {
+            background: #0284c7;
+            color: #fff;
+            border-color: #38bdf8;
+            font-weight: 500;
+        }
+
+        /* Bottom Player Controls */
+        .player-container {
+            position: absolute;
+            bottom: 25px;
+            right: 50%;
+            transform: translateX(50%);
+            z-index: 1000;
+            width: 90%;
+            max-width: 650px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 18px;
+            padding: 14px 20px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .time-display {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            direction: ltr;
+        }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn-play {
+            background: #0284c7;
+            color: #ffffff;
+            border: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+        }
+
+        .btn-play:hover {
+            background: #0369a1;
+            transform: scale(1.05);
+        }
+
+        .timeline-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #334155;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+            transition: transform 0.1s;
+        }
+
+        .timeline-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Radar Legend Bar */
+        .legend-container {
+            position: absolute;
+            bottom: 110px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .legend-bar {
+            width: 140px;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000, #ff00ff);
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <!-- Top Navigation Header -->
+    <div class="top-header">
+        <div class="brand-card">
+            <i class="fa-solid fa-radar"></i>
+            <div>
+                <div class="brand-title">رادار السعودية للمطر</div>
+                <div class="brand-subtitle">تحديثات لحظية لحركة السحب والخيرات</div>
+            </div>
+        </div>
+
+        <div class="controls-group">
+            <button class="btn-action" id="btn-locate" title="موقعي الحالي">
+                <i class="fa-solid fa-location-crosshairs"></i>
+            </button>
+            <button class="btn-action" id="btn-refresh" title="تحديث البيانات">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- City Quick-Jump Chips -->
+    <div class="city-chips">
+        <div class="chip active" onclick="flyToCity(24.7136, 46.6753, 7)">الرياض 📍</div>
+        <div class="chip" onclick="flyToCity(26.3260, 43.9750, 8)">القصيم (بريدة) 🌴</div>
+        <div class="chip" onclick="flyToCity(21.4858, 39.1925, 8)">جدة ومكة 🕋</div>
+        <div class="chip" onclick="flyToCity(26.4207, 50.0888, 8)">الشرقية (الدمام) 🌊</div>
+        <div class="chip" onclick="flyToCity(18.2164, 42.5053, 8)">عسير (أبها) ⛰️</div>
+        <div class="chip" onclick="flyToCity(24.4672, 39.6112, 8)">المدينة المنورة 🕌</div>
+        <div class="chip" onclick="flyToCity(28.3835, 36.5662, 8)">تبوك 🏔️</div>
+        <div class="chip" onclick="flyToCity(27.5114, 41.7208, 8)">حائل 🐪</div>
+    </div>
+
+    <!-- Radar Legend -->
+    <div class="legend-container">
+        <span>شدة الأمطار (Radar Reflectivity)</span>
+        <div class="legend-bar"></div>
+        <div class="legend-labels">
+            <span>خفيفة</span>
+            <span>متوسطة</span>
+            <span>غزيرة / برد</span>
+        </div>
+    </div>
+
+    <!-- Bottom Player Controls -->
+    <div class="player-container">
+        <div class="player-info">
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span id="radar-status">مباشر - رادار الأمطار</span>
+            </div>
+            <div class="time-display" id="time-display">--:-- --</div>
+        </div>
+        <div class="player-controls">
+            <button class="btn-play" id="btn-play">
+                <i class="fa-solid fa-play" id="play-icon"></i>
+            </button>
+            <input type="range" class="timeline-slider" id="timeline" min="0" max="0" value="0">
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Initialize Map centered on Saudi Arabia
+        const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([24.7136, 46.6753], 6);
+
+        // Dark Map Tile Layer (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18,
+            subdomains: 'abcd'
+        }).addTo(map);
+
+        // Add Zoom Controls on Left Bottom
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+        // Radar Player State Variables
+        let radarFrames = [];
+        let radarLayers = {};
+        let currentFrameIndex = 0;
+        let isPlaying = false;
+        let playInterval = null;
+
+        // UI Elements
+        const playBtn = document.getElementById('btn-play');
+        const playIcon = document.getElementById('play-icon');
+        const timeline = document.getElementById('timeline');
+        const timeDisplay = document.getElementById('time-display');
+        const statusBadge = document.getElementById('radar-status');
+
+        // 2. Fetch Radar Tiles Timeline from RainViewer Radar API
+        async function loadRadarTimeline() {
+            try {
+                statusBadge.textContent = "جاري تحميل بيانات الرادار...";
+                const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+                const data = await response.json();
+
+                if (!data || !data.radar || !data.radar.past) {
+                    throw new Error("Invalid radar data structure");
+                }
+
+                // Get past radar frames (last 2 hours)
+                radarFrames = data.radar.past;
+                const host = data.host;
+
+                // Clear old layers if any
+                Object.values(radarLayers).forEach(layer => map.removeLayer(layer));
+                radarLayers = {};
+
+                // Pre-create tile layers for each frame
+                radarFrames.forEach((frame, idx) => {
+                    const tileUrl = `${host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+                    const layer = L.tileLayer(tileUrl, {
+                        tileSize: 256,
+                        opacity: idx === radarFrames.length - 1 ? 0.8 : 0,
+                        zIndex: 100 + idx
+                    });
+                    layer.addTo(map);
+                    radarLayers[frame.time] = layer;
+                });
+
+                // Update Timeline UI
+                timeline.max = radarFrames.length - 1;
+                timeline.value = radarFrames.length - 1;
+                currentFrameIndex = radarFrames.length - 1;
+
+                showFrame(currentFrameIndex);
+                statusBadge.textContent = "مباشر - رادار الأمطار";
+
+            } catch (err) {
+                console.error("Error loading radar tiles:", err);
+                statusBadge.textContent = "خطأ في اتصال الرادار";
+            }
+        }
+
+        // 3. Switch visible radar frame
+        function showFrame(index) {
+            if (!radarFrames.length) return;
+
+            // Hide all layers
+            radarFrames.forEach((frame, i) => {
+                if (radarLayers[frame.time]) {
+                    radarLayers[frame.time].setOpacity(i === index ? 0.85 : 0);
+                }
+            });
+
+            // Update Time Text
+            const timeStamp = radarFrames[index].time * 1000;
+            const dateObj = new Date(timeStamp);
+            
+            // Format to Saudi Local Time
+            const timeString = dateObj.toLocaleTimeString('ar-SA', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+            });
+            const dateString = dateObj.toLocaleDateString('ar-SA', {
+                month: 'short',
+                day: 'numeric'
+            });
+
+            timeDisplay.textContent = `${dateString} | ${timeString}`;
+            timeline.value = index;
+            currentFrameIndex = index;
+        }
+
+        // 4. Play / Pause Functionality
+        function togglePlay() {
+            if (isPlaying) {
+                pauseAnimation();
+            } else {
+                startAnimation();
+            }
+        }
+
+        function startAnimation() {
+            isPlaying = true;
+            playIcon.className = "fa-solid fa-pause";
+            playInterval = setInterval(() => {
+                currentFrameIndex = (currentFrameIndex + 1) % radarFrames.length;
+                showFrame(currentFrameIndex);
+            }, 600); // Frame duration 600ms
+        }
+
+        function pauseAnimation() {
+            isPlaying = false;
+            playIcon.className = "fa-solid fa-play";
+            if (playInterval) clearInterval(playInterval);
+        }
+
+        // Timeline Slider Interaction
+        timeline.addEventListener('input', (e) => {
+            pauseAnimation();
+            showFrame(parseInt(e.target.value));
+        });
+
+        playBtn.addEventListener('click', togglePlay);
+
+        // 5. Quick Fly to City
+        function flyToCity(lat, lng, zoom = 8) {
+            map.flyTo([lat, lng], zoom, {
+                animate: true,
+                duration: 1.5
+            });
+
+            // Update Active Chip Style
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+        }
+
+        // Locate Me Button
+        document.getElementById('btn-locate').addEventListener('click', () => {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    map.flyTo([latitude, longitude], 10, { animate: true });
+                }, () => {
+                    alert("تعذر تحديد موقعك. يرجى السماح للوصول للموقع.");
+                });
+            }
+        });
+
+        // Refresh Button
+        document.getElementById('btn-refresh').addEventListener('click', () => {
+            loadRadarTimeline();
+        });
+
+        // Initialize on Load
+        loadRadarTimeline();
+
+        // Refresh radar frames every 5 minutes automatically
+        setInterval(loadRadarTimeline, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
